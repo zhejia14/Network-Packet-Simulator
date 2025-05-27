@@ -2146,11 +2146,11 @@ void SDN_controller::recv_handler (packet *p){
         SDN_invoke_packet *p3 = nullptr;
         p3 = dynamic_cast<SDN_invoke_packet*>(p);
         vector<vector<double> > v = (dynamic_cast<SDN_invoke_payload*>(p3->getPayload()))->getTrafficMatrix();
-        vector<pair<int,int> > sdn_set;
+        vector<int> sdn_set;
         vector<int> dst_set;
         const map<unsigned int,bool> &nblist = getPhyNeighbors();
         for (map<unsigned int,bool>::const_iterator it = nblist.begin(); it != nblist.end(); it ++) {//get sdn set (controller nb)
-            sdn_set.push_back(make_pair(it->first,0));
+            sdn_set.push_back(it->first);
         }
         int nd_num = getNodeID();
         vector<pair<int,double> > pair_set;
@@ -2160,12 +2160,7 @@ void SDN_controller::recv_handler (packet *p){
         for(int i=0;i<dst_set.size();i++){//update traffic matrix with ospf path
             int now_dst=dst_set[i];
             for(int j=0;j<nd_num;j++){
-                if(v[now_dst][j]>0){
-                    pair_set.push_back(make_pair(j, v[now_dst][j]));
-                    for(auto iter=sdn_set.begin();iter!=sdn_set.end();iter++){
-                        if(iter->first==j)iter->second=1;
-                    }
-                }
+                if(v[now_dst][j]>0)pair_set.push_back(make_pair(j, v[now_dst][j]));
             }
             for(int k=0;k<pair_set.size();k++){
                 int tmp=pair_set[k].first;
@@ -2187,14 +2182,13 @@ void SDN_controller::recv_handler (packet *p){
                 }
             }
         }
-       // for(int i=0;i<sdn_set.size();i++)cout<<sdn_set[i].first<<" "<<sdn_set[i].second<<endl;
         for(int count=0;count<dst_set.size();count++){
             struct SDN_ctrl_Info{int sdn;int dst;int pass;double percent;};
             int now_dst=dst_set[count];
-            
+           
             for(int i=0;i<sdn_set.size();i++){
                 vector<pair<int, double> > path;
-                int now_sdn=sdn_set[i].first;
+                int now_sdn=sdn_set[i];
                 SDN_switch *s=nullptr;
                 s=dynamic_cast<SDN_switch *>(node::id_to_node(now_sdn));
                 int n_sdn_paraent=s->getNexthop(now_dst);//now sdn ospf parent
@@ -2258,15 +2252,8 @@ void SDN_controller::recv_handler (packet *p){
                                 temp=tmp->getNexthop(now_dst);
                             }
                         }//distance
-                        if( sdn_set[i].second==0 && t->getNexthop(now_dst)!=now_sdn && neb_dis<dis){//neb distance < now sdn distance now sdn not src
+                        if(t->getNexthop(now_dst)!=now_sdn && neb_dis<dis){//neb distance < now sdn distance
                             path.push_back(make_pair(it->first,v[now_sdn][it->first]));
-                        }
-                        else if (sdn_set[i].second==1){
-                            for(auto iter = sdn_set.begin();iter!=sdn_set.end();iter++){//neb distance <= now sdn distance now sdn is src
-                                if(iter->first==it->first && iter->second==0 && neb_dis<=dis){                           //neb sdn not a src
-                                    path.push_back(make_pair(it->first,v[now_sdn][it->first]));
-                                }
-                            }
                         }
                     }
                 }
